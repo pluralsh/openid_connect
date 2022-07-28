@@ -44,12 +44,14 @@ defmodule OpenIDConnect.Worker do
   end
 
   def handle_info({:update_documents, provider}, state) do
+    Logger.info "updating oidc configuration for #{provider}"
     config = get_in(state, [provider, :config])
     case update_documents(provider, config) do
       {:ok, docs} -> {:noreply, put_in(state, [provider, :documents], docs)}
       _ ->
         Logger.error "Failed to update oidc configuration for #{provider}"
-        send_doc_update(provider, :timer.seconds(30))
+        jitter = :rand.uniform(15)
+        send_doc_update(provider, :timer.seconds(30 + jitter))
         {:noreply, state}
     end
   end
