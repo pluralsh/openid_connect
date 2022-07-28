@@ -1,5 +1,6 @@
 defmodule OpenIDConnect.Worker do
   use GenServer
+  require Logger
 
   @moduledoc """
   Worker module for OpenID Connect
@@ -20,7 +21,7 @@ defmodule OpenIDConnect.Worker do
   def init(provider_configs) do
     state =
       Enum.into(provider_configs, %{}, fn {provider, config} ->
-        documents = update_documents(provider, config)
+        documents = update_documents!(provider, config)
         {provider, %{config: config, documents: documents}}
       end)
 
@@ -44,23 +45,31 @@ defmodule OpenIDConnect.Worker do
 
   def handle_info({:update_documents, provider}, state) do
     config = get_in(state, [provider, :config])
-    documents = update_documents(provider, config)
-
-    state = put_in(state, [provider, :documents], documents)
-
-    {:noreply, state}
+    case update_documents(provider, config) do
+      {:ok, docs} -> {:noreply, put_in(state, [provider, :documents], docs)}
+      _ ->
+        Logger.error "Failed to update oidc configuration for #{provider}"
+        send_doc_update(provider, :timer.seconds(30))
+        {:noreply, state}
+    end
   end
 
   defp update_documents(provider, config) do
-    {:ok, %{remaining_lifetime: remaining_lifetime}} =
-      {:ok, documents} = OpenIDConnect.update_documents(config)
+    with {:ok, %{remaining_lifetime: remaining_lifetime} = documents} <- OpenIDConnect.update_documents(config) do
+      refresh_time = time_until_next_refresh(remaining_lifetime)
+      send_doc_update(provider, refresh_time)
 
-    refresh_time = time_until_next_refresh(remaining_lifetime)
-
-    Process.send_after(self(), {:update_documents, provider}, refresh_time)
-
-    documents
+      {:ok, documents}
+    end
   end
+
+  def update_documents!(provider, config) do
+    {:ok, docs} = update_documents(provider, config)
+    docs
+  end
+
+  defp send_doc_update(provider, refresh_time),
+    do: Process.send_after(self(), {:update_documents, provider}, refresh_time)
 
   defp time_until_next_refresh(nil), do: @refresh_time
 
