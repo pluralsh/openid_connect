@@ -19,11 +19,10 @@ defmodule OpenIDConnect.Worker do
   end
 
   def init(provider_configs) do
-    state =
-      Enum.into(provider_configs, %{}, fn {provider, config} ->
-        documents = update_documents!(provider, config)
-        {provider, %{config: config, documents: documents}}
-      end)
+    state = Enum.into(provider_configs, %{}, fn {provider, config} ->
+      send(self(), {:update_documents, provider})
+      {provider, %{config: config}}
+    end)
 
     {:ok, state}
   end
