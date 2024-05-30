@@ -61,7 +61,7 @@ defmodule OpenIDConnect.Mixfile do
       {:jason, ">= 1.0.0"},
       {:jose, "~> 1.8"},
       {:earmark, "~> 1.2", only: :dev},
-      {:ex_doc, "~> 0.18", only: :dev},
+      {:ex_doc, "~> 0.34", only: :dev},
       {:mox, "~> 0.4", only: :test}
     ]
   end
